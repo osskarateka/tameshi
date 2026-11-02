@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iPad端末管理簿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* レイアウト: 上部に台数サマリー、タブで「端末・貸出返却・アカウント・修理・取込」を切り替える業務ツール */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#1d2624; --muted:#5d6b67; --line:#d9e0dd;
+  --accent:#1f6f5c; --accent-soft:#e1efea;
+  --ok:#2c7a3f; --ok-soft:#e3f2e6; --warn:#a15c07; --warn-soft:#fbefd9;
+  --bad:#b3261e; --bad-soft:#fae3e1; --info:#2a5c9a; --info-soft:#e2ebf7; --gray-soft:#eceeed;
+  --font-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121715; --surface:#1a211f; --ink:#e4ebe8; --muted:#9aa8a3; --line:#2c3633;
+    --accent:#5cc2a3; --accent-soft:#1d3a32;
+    --ok:#7fd193; --ok-soft:#1e3324; --warn:#f0b35a; --warn-soft:#3a2b14;
+    --bad:#f08a80; --bad-soft:#3d1f1c; --info:#8db6ee; --info-soft:#1c2a3d; --gray-soft:#262e2c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121715; --surface:#1a211f; --ink:#e4ebe8; --muted:#9aa8a3; --line:#2c3633;
+  --accent:#5cc2a3; --accent-soft:#1d3a32;
+  --ok:#7fd193; --ok-soft:#1e3324; --warn:#f0b35a; --warn-soft:#3a2b14;
+  --bad:#f08a80; --bad-soft:#3d1f1c; --info:#8db6ee; --info-soft:#1c2a3d; --gray-soft:#262e2c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 20px 60px;display:flex;flex-direction:column;gap:18px}
+header.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px}
+h1{font-size:22px;margin:0;font-weight:700;text-wrap:balance}
+h2{font-size:17px;margin:0;font-weight:700;text-wrap:balance}
+h3{font-size:15px;margin:0;font-weight:700}
+.sub{color:var(--muted);font-size:13px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+.banner{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 14px;font-size:14px}
+.banner.warn{border-color:var(--warn);background:var(--warn-soft)}
+.banner.bad{border-color:var(--bad);background:var(--bad-soft)}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:2px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.tile:hover{border-color:var(--accent)}
+.tile .k{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.tile .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+nav.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line)}
+nav.tabs button{font:inherit;background:none;border:none;border-bottom:3px solid transparent;padding:8px 14px;color:var(--muted);cursor:pointer;font-weight:500}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs button:hover{color:var(--ink)}
+
+section.view{display:none;flex-direction:column;gap:16px}
+section.view.on{display:flex}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:3px;min-width:140px;flex:1}
+.field.narrow{flex:0 1 150px;min-width:120px}
+.field label{font-size:12px;color:var(--muted);font-weight:500}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%}
+textarea{min-height:90px;font-family:var(--font-mono);font-size:13px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer;white-space:nowrap}
+button.btn:hover{border-color:var(--accent)}
+button.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button.btn.primary:hover{filter:brightness(1.08)}
+button.btn.danger{color:var(--bad);border-color:var(--bad)}
+button.btn.small{padding:3px 10px;font-size:13px}
+button.btn:disabled{opacity:.5;cursor:not-allowed}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:3px 12px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);border-color:var(--accent)}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:500;background:var(--bg);position:sticky;top:0;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--accent-soft)}
+td.empty{color:var(--muted);text-align:center;padding:22px}
+.pill{display:inline-block;font-size:12px;font-weight:500;border-radius:999px;padding:1px 10px;white-space:nowrap}
+.p-保管中{background:var(--gray-soft);color:var(--ink)}
+.p-配布中{background:var(--info-soft);color:var(--info)}
+.p-貸出中{background:var(--ok-soft);color:var(--ok)}
+.p-修理中{background:var(--warn-soft);color:var(--warn)}
+.p-廃棄{background:var(--gray-soft);color:var(--muted);text-decoration:line-through}
+.p-期限切れ{background:var(--bad-soft);color:var(--bad)}
+.p-受付{background:var(--bad-soft);color:var(--bad)}
+.p-修理依頼中{background:var(--warn-soft);color:var(--warn)}
+.p-完了{background:var(--ok-soft);color:var(--ok)}
+.p-有効{background:var(--ok-soft);color:var(--ok)}
+.p-停止{background:var(--gray-soft);color:var(--muted)}
+.overdue td{background:var(--bad-soft)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.list{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.list li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding-bottom:5px;font-size:14px}
+.list li:last-child{border-bottom:none}
+
+dialog{border:1px solid var(--line);border-radius:12px;padding:0;background:var(--surface);color:var(--ink);width:min(720px,94vw);max-height:90vh}
+dialog::backdrop{background:rgba(10,20,18,.45)}
+.dlg{display:flex;flex-direction:column;gap:14px;padding:18px;max-height:88vh;overflow:auto}
+.dlg header{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.dlg .actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 18px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;max-width:90vw}
+#toast.show{opacity:1}
+.progress{height:6px;background:var(--gray-soft);border-radius:3px;overflow:hidden}
+.progress span{display:block;height:100%;background:var(--accent);width:0}
+@media (prefers-reduced-motion: reduce){#toast{transition:none}}
+@media (max-width:520px){.wrap{padding:14px 16px 50px}.tile .v{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>iPad端末管理簿</h1>
+      <div class="sub" id="syncNote">データを読み込んでいます…</div>
+    </div>
+    <div class="row" style="align-items:center"><span class="sub" id="whoami"></span><button class="btn small" type="button" id="connBtn">接続設定</button><button class="btn small" type="button" id="reloadBtn">最新にする</button></div>
+  </header>
+
+  <div id="notice" class="banner warn" hidden></div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="devices" aria-selected="true">端末一覧</button>
+    <button role="tab" data-tab="loans" aria-selected="false">配布・貸出と返却</button>
+    <button role="tab" data-tab="accounts" aria-selected="false">アカウント</button>
+    <button role="tab" data-tab="repairs" aria-selected="false">故障・修理</button>
+    <button role="tab" data-tab="io" aria-selected="false">取り込み・書き出し</button>
+  </nav>
+
+  <!-- 端末一覧 -->
+  <section class="view on" id="v-devices">
+    <div class="row">
+      <div class="field"><label for="dvSearch">検索(管理番号・シリアル・使用者・クラス・アカウント)</label><input id="dvSearch" type="search" placeholder="例: A-012 / 2年1組 / 山田"></div>
+      <button class="btn primary" id="dvAdd">端末を登録</button>
+    </div>
+    <div class="chips" id="dvFilter"></div>
+    <div class="sub" id="dvCount"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>管理番号</th><th>状態</th><th>使用者</th><th>クラス</th><th>機種</th><th>シリアル番号</th><th>アカウント</th><th>保管場所</th></tr></thead>
+      <tbody id="dvBody"></tbody>
+    </table></div>
+  </section>
+
+  <!-- 配布・貸出 -->
+  <section class="view" id="v-loans">
+    <div class="grid2">
+      <form class="card" id="lendForm">
+        <h2>配布・貸出する</h2>
+        <div class="row">
+          <div class="field narrow"><label for="lnNo">管理番号</label><input id="lnNo" list="dlAvail" required autocomplete="off"></div>
+          <div class="field narrow"><label for="lnType">種別</label><select id="lnType"><option>貸出</option><option>配布</option></select></div>
+        </div>
+        <div class="sub" id="lnInfo">保管中の端末だけ選べます。</div>
+        <div class="row">
+          <div class="field"><label for="lnName">使用者の氏名</label><input id="lnName" required></div>
+          <div class="field narrow"><label for="lnCls">クラス・所属</label><input id="lnCls" placeholder="2年1組 / 教員"></div>
+        </div>
+        <div class="row">
+          <div class="field narrow" id="lnDueWrap"><label for="lnDue">返却予定日</label><input id="lnDue" type="date"></div>
+          <div class="field"><label for="lnMemo">メモ</label><input id="lnMemo" placeholder="充電器も貸出 など"></div>
+        </div>
+        <div class="row"><button class="btn primary" type="submit">記録する</button></div>
+      </form>
+      <form class="card" id="returnForm">
+        <h2>返却を受け付ける</h2>
+        <div class="row">
+          <div class="field narrow"><label for="rtNo">管理番号</label><input id="rtNo" list="dlOut" required autocomplete="off"></div>
+          <div class="field"><label for="rtMemo">返却時のメモ</label><input id="rtMemo" placeholder="画面に傷あり など"></div>
+        </div>
+        <div class="sub" id="rtInfo">配布中・貸出中の端末だけ選べます。</div>
+        <div class="row"><button class="btn primary" type="submit">返却を記録する</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h2>いま手元にない端末</h2>
+        <div class="chips" id="outFilter">
+          <button class="chip" type="button" data-f="all" aria-pressed="true">すべて</button>
+          <button class="chip" type="button" data-f="貸出" aria-pressed="false">貸出のみ</button>
+          <button class="chip" type="button" data-f="配布" aria-pressed="false">配布のみ</button>
+          <button class="chip" type="button" data-f="over" aria-pressed="false">期限切れ</button>
+        </div>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>管理番号</th><th>種別</th><th>使用者</th><th>クラス</th><th>渡した日</th><th>返却予定日</th><th></th></tr></thead>
+        <tbody id="outBody"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>配布・貸出の履歴</h2>
+      <div class="row"><div class="field"><label for="hsSearch">履歴を検索</label><input id="hsSearch" type="search" placeholder="管理番号・氏名・クラス"></div></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>管理番号</th><th>種別</th><th>使用者</th><th>クラス</th><th>渡した日</th><th>返却日</th><th>メモ</th><th>処理した人</th></tr></thead>
+        <tbody id="hsBody"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- アカウント -->
+  <section class="view" id="v-accounts">
+    <div class="banner small">パスワードはここに書かないでください。この管理簿を見られる人全員に表示されます。</div>
+    <div class="row">
+      <div class="field"><label for="acSearch">検索(ID・氏名・クラス・管理番号)</label><input id="acSearch" type="search"></div>
+      <div class="field narrow"><label for="acKind">種類</label><select id="acKind"><option value="">すべて</option></select></div>
+      <button class="btn primary" id="acAdd">アカウントを登録</button>
+    </div>
+    <div class="sub" id="acCount"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>アカウントID</th><th>種類</th><th>状態</th><th>氏名</th><th>クラス</th><th>端末</th><th>メモ</th></tr></thead>
+      <tbody id="acBody"></tbody>
+    </table></div>
+  </section>
+
+  <!-- 修理 -->
+  <section class="view" id="v-repairs">
+    <form class="card" id="rpForm">
+      <h2>故障・破損を登録する</h2>
+      <div class="row">
+        <div class="field narrow"><label for="rpNo">管理番号</label><input id="rpNo" list="dlAll" required autocomplete="off"></div>
+        <div class="field narrow"><label for="rpDate">発生日</label><input id="rpDate" type="date" required></div>
+        <div class="field narrow"><label for="rpCause">区分</label><select id="rpCause"><option>自然故障</option><option>破損(落下など)</option><option>水濡れ</option><option>紛失</option><option>その他</option></select></div>
+      </div>
+      <div class="row"><div class="field"><label for="rpSymptom">症状・状況</label><input id="rpSymptom" required placeholder="画面割れ。休み時間に落とした"></div></div>
+      <div class="sub">登録すると端末の状態が「修理中」になり、修理が完了すると元の状態に戻ります。</div>
+      <div class="row"><button class="btn primary" type="submit">登録する</button></div>
+    </form>
+    <div class="chips" id="rpFilter">
+      <button class="chip" type="button" data-f="open" aria-pressed="true">対応中</button>
+      <button class="chip" type="button" data-f="完了" aria-pressed="false">完了</button>
+      <button class="chip" type="button" data-f="all" aria-pressed="false">すべて</button>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>管理番号</th><th>進み具合</th><th>発生日</th><th>区分</th><th>症状</th><th>使用者</th><th>修理依頼日</th><th>完了日</th><th>依頼先</th></tr></thead>
+      <tbody id="rpBody"></tbody>
+    </table></div>
+  </section>
+
+  <!-- 取り込み・書き出し -->
+  <section class="view" id="v-io">
+    <div class="banner small">Excelで作った表は「CSV(コンマ区切り)」で保存して取り込めます。1行目は見出しにしてください。文字コードはUTF-8とShift_JISのどちらでも読めます。</div>
+    <div class="grid2">
+      <div class="card" data-imp="devices">
+        <h2>端末をまとめて登録</h2>
+        <div class="sub">見出し: <span class="mono small">管理番号,シリアル番号,機種,購入日,保管場所,メモ</span><br>管理番号がすでにある端末は内容を上書きします。管理番号以外は空欄でもかまいません。</div>
+      </div>
+      <div class="card" data-imp="accounts">
+        <h2>アカウントをまとめて登録</h2>
+        <div class="sub">見出し: <span class="mono small">アカウントID,種類,氏名,クラス,管理番号,状態,メモ</span><br>同じアカウントIDがあれば上書きします。</div>
+      </div>
+      <div class="card" data-imp="bulkLend">
+        <h2>クラス単位で一括配布・貸出</h2>
+        <div class="sub">見出し: <span class="mono small">管理番号,氏名,クラス,種別,返却予定日</span><br>種別は「配布」か「貸出」。空欄なら配布として記録します。保管中の端末だけ処理し、それ以外は飛ばします。</div>
+      </div>
+      <div class="card">
+        <h2>CSVで書き出す</h2>
+        <div class="sub">Excelでそのまま開ける形式で保存します。</div>
+        <div class="row">
+          <button class="btn" data-exp="devices">端末一覧</button>
+          <button class="btn" data-exp="loans">配布・貸出の履歴</button>
+          <button class="btn" data-exp="accounts">アカウント</button>
+          <button class="btn" data-exp="repairs">修理記録</button>
+        </div>
+        
+      </div>
+    </div>
+  </section>
+</div>
+
+<datalist id="dlAvail"></datalist>
+<datalist id="dlOut"></datalist>
+<datalist id="dlAll"></datalist>
+
+<dialog id="dlg"><form class="dlg" id="dlgForm" method="dialog"></form></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const STATUSES=["保管中","配布中","貸出中","修理中","廃棄"];
+const STATUS_COLOR={"保管中":"var(--muted)","配布中":"var(--info)","貸出中":"var(--ok)","修理中":"var(--warn)","廃棄":"var(--line)"};
+const ACCOUNT_KINDS=["管理対象Apple ID","Apple ID","Googleアカウント","Microsoftアカウント","校内アカウント","その他"];
+const S={devices:[],loans:[],repairs:[],accounts:[]};
+const loaded={devices:false,loans:false,repairs:false,accounts:false};
+let me=null;
+const names={};
+const ui={dvFilter:"all",dvSearch:"",outFilter:"all",hsSearch:"",acSearch:"",acKind:"",rpFilter:"open"};
+
+const $=s=>document.querySelector(s);
+const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const nowIso=()=>new Date().toISOString();
+const cmpNo=(a,b)=>String(a||"").localeCompare(String(b||""),"ja",{numeric:true});
+const norm=s=>String(s||"").trim().normalize("NFKC");
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),3200)}
+function pill(s){return s?'<span class="pill p-'+esc(s)+'">'+esc(s)+'</span>':""}
+function devByNo(no){no=norm(no);return S.devices.find(d=>norm(d.no)===no)}
+function devById(id){return S.devices.find(d=>d.id===id)}
+function isOver(d){return d.status==="貸出中"&&d.due&&d.due<today()}
+function nameOf(n){return n||""}
+
+// ---------- 接続(Googleスプレッドシート) ----------
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const LS="ipadKanri.conn";
+let conn=null;
+function loadConn(){
+  let c=null;try{c=JSON.parse(localStorage.getItem(LS)||"null")}catch(e){}
+  try{const p=new URLSearchParams(location.search).get("api");if(p){c=Object.assign({},c||{},{url:p});history.replaceState(null,"",location.pathname+location.hash)}}catch(e){}
+  return c;
+}
+function saveConn(c){conn=c;try{localStorage.setItem(LS,JSON.stringify(c))}catch(e){}}
+async function api(action,extra){
+  const body=JSON.stringify(Object.assign({key:conn.key,action,by:conn.name||""},extra||{}));
+  let lastErr;
+  for(let i=0;i<3;i++){
+    try{
+      const r=await fetch(conn.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body,redirect:"follow"});
+      const j=await r.json();
+      if(!j.ok){const e=new Error(j.message||j.error);e.code=j.error;throw e}
+      return j;
+    }catch(e){lastErr=e;if(e.code)throw e;await sleep(800*(i+1))}
+  }
+  throw lastErr;
+}
+function failMsg(e){
+  const c=e&&e.code;
+  if(c==="wrong_key")return "合言葉が違います。右上の「接続設定」で入れ直してください。";
+  if(c==="no_passphrase")return "スプレッドシートで合言葉がまだ設定されていません。";
+  if(c==="server_error")return "スプレッドシート側でエラーが出ました: "+(e.message||"");
+  return "スプレッドシートにつながりませんでした。通信状況と接続設定を確認してください。";
+}
+function need(){
+  if(!conn||!conn.url||!conn.key){openSetup();return false}
+  if(!conn.name){toast("接続設定で名前を入れてください");openSetup();return false}
+  return true;
+}
+function stamp(o){o.updatedAt=nowIso();if(me)o.updatedBy=me;return o}
+function newId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+
+// 書き込みはまとめて送る(画面にはすぐ反映)
+let queue=[],flushing=false,flushTimer=null;
+function localApply(op){
+  const arr=S[op.sheet];const i=arr.findIndex(x=>x.id===op.id);
+  if(op.op==="delete"){if(i>=0)arr.splice(i,1);return}
+  if(i>=0)arr[i]=Object.assign({},arr[i],op.data);else arr.push(Object.assign({id:op.id},op.data));
+}
+let rq=0;function scheduleRender(){if(rq)return;rq=requestAnimationFrame(()=>{rq=0;renderAll()})}
+function enqueue(op){localApply(op);queue.push(op);scheduleRender();setSync("保存しています…");clearTimeout(flushTimer);flushTimer=setTimeout(flush,queue.length>=100?0:250);return Promise.resolve()}
+async function put(col,id,data){return enqueue({op:"upsert",sheet:col,id,data:Object.assign({},data)})}
+async function patch(col,id,data){return enqueue({op:"upsert",sheet:col,id,data:Object.assign({},data)})}
+async function del(col,id){return enqueue({op:"delete",sheet:col,id})}
+async function flush(){
+  if(flushing||!queue.length)return;
+  flushing=true;
+  const ops=queue.splice(0,100);
+  try{
+    const j=await api("batch",{ops});
+    if(!queue.length){setData(j.data)}
+    setSync("保存しました "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));
+  }catch(e){
+    queue=[];toast(failMsg(e));setSync("保存できませんでした");
+    await reload();
+  }finally{
+    flushing=false;
+    if(queue.length)flush();
+  }
+}
+window.addEventListener("beforeunload",e=>{if(queue.length||flushing){e.preventDefault();e.returnValue=""}});
+
+function setSync(t){$("#syncNote").textContent=t}
+function setData(data){["devices","loans","repairs","accounts"].forEach(k=>{S[k]=(data&&data[k])||[];loaded[k]=true});renderAll()}
+async function reload(){
+  if(!conn||!conn.url||!conn.key)return;
+  try{const j=await api("load");if(!queue.length&&!flushing){setData(j.data);setSync("最新の状態です "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}))}$("#notice").hidden=true}
+  catch(e){showNotice(failMsg(e),"bad");setSync("未接続")}
+}
+
+// ---------- init ----------
+async function init(){
+  renderAll();
+  conn=loadConn();
+  if(conn&&conn.name){me=conn.name;$("#whoami").textContent=conn.name+" さんとして記録します"}
+  if(!conn||!conn.url||!conn.key){setSync("未接続");openSetup();return}
+  setSync("データを読み込んでいます…");
+  await reload();
+  setInterval(()=>{if(document.visibilityState==="visible"&&!queue.length&&!flushing)reload()},30000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!queue.length&&!flushing)reload()});
+}
+function showNotice(msg,kind){const n=$("#notice");n.hidden=false;n.className="banner "+(kind||"warn");n.textContent=msg}
+async function resolveNames(){}
+
+function openSetup(){
+  const c=conn||{};
+  openDlg('<header><h2>接続設定</h2></header>'+
+    '<div class="sub">データはGoogleスプレッドシートに保存します。管理担当の先生から、ウェブアプリのURLと合言葉を教えてもらって入れてください。この設定はこのブラウザにだけ保存されます。</div>'+
+    '<div class="row">'+fld("cUrl","ウェブアプリのURL",c.url,{req:true,ph:"https://script.google.com/macros/s/…/exec"})+'</div>'+
+    '<div class="row">'+fld("cKey","合言葉",c.key,{req:true,type:"password"})+fld("cName","あなたの名前(記録に残ります)",c.name,{req:true,narrow:true,ph:"山田"})+'</div>'+
+    '<div class="sub" id="cMsg"></div>'+
+    '<div class="actions"><button class="btn" value="cancel" formnovalidate>閉じる</button><button class="btn primary" value="ok">接続する</button></div>',
+  async()=>{
+    const nc={url:fv("cUrl"),key:(dform.querySelector("#cKey").value||"").trim(),name:fv("cName")};
+    if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(nc.url)){dform.querySelector("#cMsg").textContent="URLは https://script.google.com/ で始まるものを入れてください。";return false}
+    const old=conn;conn=nc;
+    try{const j=await api("load");saveConn(nc);me=nc.name;$("#whoami").textContent=nc.name+" さんとして記録します";setData(j.data);$("#notice").hidden=true;setSync("最新の状態です");toast("接続しました");
+      if(!init._poll){init._poll=setInterval(()=>{if(document.visibilityState==="visible"&&!queue.length&&!flushing)reload()},30000)}
+      return true}
+    catch(e){conn=old;dform.querySelector("#cMsg").textContent=failMsg(e);return false}
+  });
+}
+
+// ---------- render ----------
+function renderAll(){renderTiles();renderDevices();renderOut();renderHistory();renderAccounts();renderRepairs();renderLists()}
+
+function renderTiles(){
+  const c={};STATUSES.forEach(s=>c[s]=0);S.devices.forEach(d=>{c[d.status||"保管中"]=(c[d.status||"保管中"]||0)+1});
+  const over=S.devices.filter(isOver).length;
+  const active=S.devices.length-c["廃棄"];
+  const items=[["総台数(廃棄除く)",active,"var(--ink)","all"],["保管中",c["保管中"],STATUS_COLOR["保管中"],"保管中"],["配布中",c["配布中"],STATUS_COLOR["配布中"],"配布中"],["貸出中",c["貸出中"],STATUS_COLOR["貸出中"],"貸出中"],["返却期限切れ",over,"var(--bad)","over"],["修理中",c["修理中"],STATUS_COLOR["修理中"],"修理中"]];
+  $("#tiles").innerHTML=items.map(([k,v,col,f])=>'<button class="tile" data-go="'+f+'"><span class="k"><span class="dot" style="background:'+col+'"></span>'+k+'</span><span class="v">'+v+'</span></button>').join("");
+}
+$("#tiles").addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!b)return;const f=b.dataset.go;
+  if(f==="over"){ui.outFilter="over";setTab("loans");renderOut();syncChips("#outFilter",ui.outFilter);return}
+  ui.dvFilter=f;setTab("devices");renderDevices()});
+
+function renderDevices(){
+  const counts={all:S.devices.length};STATUSES.forEach(s=>counts[s]=S.devices.filter(d=>(d.status||"保管中")===s).length);
+  $("#dvFilter").innerHTML=[["all","すべて"]].concat(STATUSES.map(s=>[s,s])).map(([k,l])=>'<button class="chip" type="button" data-f="'+k+'" aria-pressed="'+(ui.dvFilter===k)+'">'+l+' <span class="num">'+counts[k]+'</span></button>').join("");
+  const q=norm(ui.dvSearch).toLowerCase();
+  let rows=S.devices.filter(d=>ui.dvFilter==="all"||(d.status||"保管中")===ui.dvFilter);
+  if(q)rows=rows.filter(d=>[d.no,d.serial,d.holder,d.holderClass,d.account,d.model,d.place,d.memo].some(v=>norm(v).toLowerCase().includes(q)));
+  rows.sort((a,b)=>cmpNo(a.no,b.no));
+  $("#dvCount").textContent=rows.length+"台を表示";
+  if(!rows.length){$("#dvBody").innerHTML='<tr><td colspan="8" class="empty">'+(S.devices.length?"条件に合う端末はありません。":(loaded.devices?"まだ端末がありません。「端末を登録」か「取り込み・書き出し」から追加してください。":"読み込み中…"))+'</td></tr>';return}
+  $("#dvBody").innerHTML=rows.map(d=>'<tr class="click'+(isOver(d)?' overdue':'')+'" data-id="'+esc(d.id)+'" tabindex="0"><td class="mono">'+esc(d.no)+(d.sample?' <span class="pill p-停止">サンプル</span>':'')+'</td><td>'+pill(d.status||"保管中")+(isOver(d)?' '+pill("期限切れ"):'')+'</td><td>'+esc(d.holder)+'</td><td>'+esc(d.holderClass)+'</td><td>'+esc(d.model)+'</td><td class="mono small">'+esc(d.serial)+'</td><td class="small">'+esc(d.account)+'</td><td class="small">'+esc(d.place)+'</td></tr>').join("");
+}
+$("#dvFilter").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;ui.dvFilter=b.dataset.f;renderDevices()});
+$("#dvSearch").addEventListener("input",e=>{ui.dvSearch=e.target.value;renderDevices()});
+function rowOpen(e){const tr=e.target.closest("tr[data-id]");if(!tr)return;if(e.type==="keydown"&&e.key!=="Enter")return;openDevice(tr.dataset.id)}
+$("#dvBody").addEventListener("click",rowOpen);$("#dvBody").addEventListener("keydown",rowOpen);
+$("#dvAdd").addEventListener("click",()=>openDevice(null));
+
+function renderOut(){
+  let rows=S.devices.filter(d=>d.status==="配布中"||d.status==="貸出中");
+  if(ui.outFilter==="貸出")rows=rows.filter(d=>d.status==="貸出中");
+  if(ui.outFilter==="配布")rows=rows.filter(d=>d.status==="配布中");
+  if(ui.outFilter==="over")rows=rows.filter(isOver);
+  rows.sort((a,b)=>(isOver(b)-isOver(a))||cmpNo(a.holderClass,b.holderClass)||cmpNo(a.no,b.no));
+  if(!rows.length){$("#outBody").innerHTML='<tr><td colspan="7" class="empty">該当する端末はありません。</td></tr>';return}
+  $("#outBody").innerHTML=rows.map(d=>'<tr class="'+(isOver(d)?'overdue':'')+'"><td class="mono">'+esc(d.no)+'</td><td>'+pill(d.status)+(isOver(d)?' '+pill("期限切れ"):'')+'</td><td>'+esc(d.holder)+'</td><td>'+esc(d.holderClass)+'</td><td class="num">'+esc(d.outAt)+'</td><td class="num">'+esc(d.due||"—")+'</td><td><button class="btn small" type="button" data-ret="'+esc(d.id)+'">返却</button></td></tr>').join("");
+}
+$("#outFilter").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;ui.outFilter=b.dataset.f;syncChips("#outFilter",ui.outFilter);renderOut()});
+$("#outBody").addEventListener("click",e=>{const b=e.target.closest("[data-ret]");if(!b)return;const d=devById(b.dataset.ret);if(d)confirmReturn(d,"")});
+function syncChips(sel,val){document.querySelectorAll(sel+" [data-f]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.f===val)))}
+
+function renderHistory(){
+  const q=norm(ui.hsSearch).toLowerCase();
+  let rows=S.loans.slice();
+  if(q)rows=rows.filter(l=>[l.no,l.name,l.cls,l.memo].some(v=>norm(v).toLowerCase().includes(q)));
+  rows.sort((a,b)=>String(b.outAt||"").localeCompare(String(a.outAt||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+  const shown=rows.slice(0,200);
+  if(!shown.length){$("#hsBody").innerHTML='<tr><td colspan="8" class="empty">まだ記録がありません。</td></tr>';return}
+  $("#hsBody").innerHTML=shown.map(l=>'<tr><td class="mono">'+esc(l.no)+'</td><td>'+esc(l.type)+'</td><td>'+esc(l.name)+'</td><td>'+esc(l.cls)+'</td><td class="num">'+esc(l.outAt)+'</td><td class="num">'+(l.inAt?esc(l.inAt):'<span class="muted">未返却</span>')+'</td><td class="small">'+esc([l.memo,l.inMemo].filter(Boolean).join(" / "))+'</td><td class="small muted">'+esc(nameOf(l.outBy))+(l.inBy&&l.inBy!==l.outBy?" → "+esc(nameOf(l.inBy)):"")+'</td></tr>').join("")+(rows.length>200?'<tr><td colspan="8" class="empty">ほか'+(rows.length-200)+'件。検索で絞り込むか、CSVで書き出してください。</td></tr>':'');
+  resolveNames(shown.flatMap(l=>[l.outBy,l.inBy]));
+}
+$("#hsSearch").addEventListener("input",e=>{ui.hsSearch=e.target.value;renderHistory()});
+
+function renderAccounts(){
+  const kinds=[...new Set(ACCOUNT_KINDS.concat(S.accounts.map(a=>a.kind).filter(Boolean)))];
+  const sel=$("#acKind");const cur=ui.acKind;
+  sel.innerHTML='<option value="">すべて</option>'+kinds.map(k=>'<option'+(k===cur?' selected':'')+'>'+esc(k)+'</option>').join("");
+  const q=norm(ui.acSearch).toLowerCase();
+  let rows=S.accounts.filter(a=>!ui.acKind||a.kind===ui.acKind);
+  if(q)rows=rows.filter(a=>[a.accountId,a.name,a.cls,a.deviceNo,a.memo].some(v=>norm(v).toLowerCase().includes(q)));
+  rows.sort((a,b)=>cmpNo(a.cls,b.cls)||cmpNo(a.accountId,b.accountId));
+  $("#acCount").textContent=rows.length+"件を表示";
+  if(!rows.length){$("#acBody").innerHTML='<tr><td colspan="7" class="empty">'+(S.accounts.length?"条件に合うアカウントはありません。":"まだアカウントがありません。")+'</td></tr>';return}
+  $("#acBody").innerHTML=rows.map(a=>'<tr class="click" data-id="'+esc(a.id)+'" tabindex="0"><td class="mono small">'+esc(a.accountId)+'</td><td class="small">'+esc(a.kind)+'</td><td>'+pill(a.state||"有効")+'</td><td>'+esc(a.name)+'</td><td>'+esc(a.cls)+'</td><td class="mono">'+esc(a.deviceNo)+'</td><td class="small">'+esc(a.memo)+'</td></tr>').join("");
+}
+$("#acSearch").addEventListener("input",e=>{ui.acSearch=e.target.value;renderAccounts()});
+$("#acKind").addEventListener("change",e=>{ui.acKind=e.target.value;renderAccounts()});
+function acOpen(e){const tr=e.target.closest("tr[data-id]");if(!tr)return;if(e.type==="keydown"&&e.key!=="Enter")return;openAccount(tr.dataset.id)}
+$("#acBody").addEventListener("click",acOpen);$("#acBody").addEventListener("keydown",acOpen);
+$("#acAdd").addEventListener("click",()=>openAccount(null));
+
+function renderRepairs(){
+  let rows=S.repairs.slice();
+  if(ui.rpFilter==="open")rows=rows.filter(r=>r.step!=="完了");
+  if(ui.rpFilter==="完了")rows=rows.filter(r=>r.step==="完了");
+  rows.sort((a,b)=>String(b.reportedAt||"").localeCompare(String(a.reportedAt||"")));
+  if(!rows.length){$("#rpBody").innerHTML='<tr><td colspan="9" class="empty">該当する記録はありません。</td></tr>';return}
+  $("#rpBody").innerHTML=rows.map(r=>'<tr class="click" data-id="'+esc(r.id)+'" tabindex="0"><td class="mono">'+esc(r.no)+'</td><td>'+pill(r.step||"受付")+'</td><td class="num">'+esc(r.reportedAt)+'</td><td class="small">'+esc(r.cause)+'</td><td>'+esc(r.symptom)+'</td><td class="small">'+esc([r.holder,r.holderClass].filter(Boolean).join(" "))+'</td><td class="num">'+esc(r.sentAt)+'</td><td class="num">'+esc(r.doneAt)+'</td><td class="small">'+esc(r.vendor)+'</td></tr>').join("");
+}
+$("#rpFilter").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;ui.rpFilter=b.dataset.f;syncChips("#rpFilter",ui.rpFilter);renderRepairs()});
+function rpOpen(e){const tr=e.target.closest("tr[data-id]");if(!tr)return;if(e.type==="keydown"&&e.key!=="Enter")return;openRepair(tr.dataset.id)}
+$("#rpBody").addEventListener("click",rpOpen);$("#rpBody").addEventListener("keydown",rpOpen);
+
+function renderLists(){
+  const opt=d=>'<option value="'+esc(d.no)+'">'+esc([d.model,d.holder,d.holderClass].filter(Boolean).join(" / "))+'</option>';
+  $("#dlAvail").innerHTML=S.devices.filter(d=>(d.status||"保管中")==="保管中").sort((a,b)=>cmpNo(a.no,b.no)).map(opt).join("");
+  $("#dlOut").innerHTML=S.devices.filter(d=>d.status==="配布中"||d.status==="貸出中").sort((a,b)=>cmpNo(a.no,b.no)).map(opt).join("");
+  $("#dlAll").innerHTML=S.devices.filter(d=>d.status!=="廃棄").sort((a,b)=>cmpNo(a.no,b.no)).map(opt).join("");
+}
+
+// ---------- tabs ----------
+function setTab(t){document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===t)));document.querySelectorAll("section.view").forEach(s=>s.classList.toggle("on",s.id==="v-"+t));try{history.replaceState(null,"","#"+t)}catch(e){location.hash=t}}
+document.querySelector("nav.tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.dataset.tab)});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(document.getElementById("v-"+h))setTab(h)});
+{const h=location.hash.slice(1);if(document.getElementById("v-"+h))setTab(h)}
+
+// ---------- dialog ----------
+const dlg=$("#dlg"),dform=$("#dlgForm");
+function openDlg(html,onSubmit){
+  dform.innerHTML=html;
+  dform.onsubmit=async e=>{e.preventDefault();const act=e.submitter&&e.submitter.value;if(act==="cancel"){dlg.close();return}
+    const btns=dform.querySelectorAll("button");btns.forEach(b=>b.disabled=true);
+    try{const ok=await onSubmit(act);if(ok!==false)dlg.close()}catch(err){toast(failMsg(err))}finally{btns.forEach(b=>b.disabled=false)}};
+  dlg.showModal();
+}
+const fv=id=>norm((dform.querySelector("#"+id)||{}).value);
+function fld(id,label,val,opts){opts=opts||{};
+  if(opts.options)return '<div class="field'+(opts.narrow?' narrow':'')+'"><label for="'+id+'">'+label+'</label><select id="'+id+'">'+opts.options.map(o=>'<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>').join("")+'</select></div>';
+  return '<div class="field'+(opts.narrow?' narrow':'')+'"><label for="'+id+'">'+label+'</label><input id="'+id+'" type="'+(opts.type||"text")+'" value="'+esc(val)+'"'+(opts.req?' required':'')+(opts.list?' list="'+opts.list+'"':'')+(opts.ph?' placeholder="'+esc(opts.ph)+'"':'')+' autocomplete="off"></div>';
+}
+
+// device dialog
+function openDevice(id){
+  const d=id?devById(id):null;const x=d||{};
+  const loans=d?S.loans.filter(l=>l.deviceId===d.id).sort((a,b)=>String(b.outAt).localeCompare(String(a.outAt))):[];
+  const reps=d?S.repairs.filter(r=>r.deviceId===d.id).sort((a,b)=>String(b.reportedAt).localeCompare(String(a.reportedAt))):[];
+  const st=x.status||"保管中";
+  let h='<header><h2>'+(d?'端末 <span class="mono">'+esc(d.no)+'</span>':'端末を登録')+'</h2>'+(d?pill(st):'')+'</header>';
+  if(d&&(d.status==="配布中"||d.status==="貸出中"))h+='<div class="banner small">'+esc(d.holder)+'('+esc(d.holderClass)+') に'+esc(d.status==="配布中"?"配布":"貸出")+'中。渡した日 '+esc(d.outAt)+(d.due?'、返却予定 '+esc(d.due):'')+'</div>';
+  h+='<div class="row">'+fld("fNo","管理番号",x.no,{req:true,narrow:true})+fld("fModel","機種",x.model,{ph:"iPad 第9世代 64GB"})+'</div>';
+  h+='<div class="row">'+fld("fSerial","シリアル番号",x.serial)+fld("fBought","購入日",x.bought,{type:"date",narrow:true})+'</div>';
+  h+='<div class="row">'+fld("fPlace","保管場所",x.place,{ph:"充電保管庫2 / 職員室"})+fld("fAccount","アカウント",x.account,{list:"dlAcc",ph:"紐づくID"})+'</div>';
+  if(d&&(st==="保管中"||st==="廃棄"))h+='<div class="row">'+fld("fStatus","状態",st,{options:["保管中","廃棄"],narrow:true})+'</div>';
+  h+='<div class="row"><div class="field"><label for="fMemo">メモ</label><textarea id="fMemo" style="min-height:60px;font-family:inherit">'+esc(x.memo)+'</textarea></div></div>';
+  h+='<datalist id="dlAcc">'+S.accounts.map(a=>'<option value="'+esc(a.accountId)+'">'+esc([a.name,a.cls].filter(Boolean).join(" "))+'</option>').join("")+'</datalist>';
+  if(d){
+    h+='<h3>配布・貸出の履歴</h3>'+(loans.length?'<ul class="list">'+loans.map(l=>'<li><span>'+esc(l.type)+' '+esc(l.name)+' <span class="muted">'+esc(l.cls)+'</span></span><span class="num muted">'+esc(l.outAt)+' → '+(l.inAt?esc(l.inAt):'未返却')+'</span></li>').join("")+'</ul>':'<div class="sub">まだありません。</div>');
+    h+='<h3>修理の記録</h3>'+(reps.length?'<ul class="list">'+reps.map(r=>'<li><span>'+esc(r.symptom)+'</span><span>'+pill(r.step)+' <span class="num muted">'+esc(r.reportedAt)+'</span></span></li>').join("")+'</ul>':'<div class="sub">まだありません。</div>');
+  }
+  h+='<div class="actions">'+(d?'<button class="btn danger" value="delete" formnovalidate>この端末を削除</button>':'')+(d&&st==="保管中"?'<button class="btn" value="lend">配布・貸出へ</button>':'')+(d&&(st==="配布中"||st==="貸出中")?'<button class="btn" value="return">返却を記録</button>':'')+(d&&st!=="修理中"&&st!=="廃棄"?'<button class="btn" value="repair">故障を登録</button>':'')+'<button class="btn" value="cancel" formnovalidate>閉じる</button><button class="btn primary" value="save">保存</button></div>';
+  openDlg(h,async act=>{
+    if(act==="lend"){setTab("loans");$("#lnNo").value=d.no;updLendInfo();$("#lnName").focus();return true}
+    if(act==="return"){dlg.close();confirmReturn(d,"");return false}
+    if(act==="repair"){setTab("repairs");$("#rpNo").value=d.no;$("#rpDate").value=today();$("#rpSymptom").focus();return true}
+    if(!need())return false;
+    if(act==="delete"){
+      if(!(await askConfirm("端末 "+d.no+" を削除しますか？","履歴は残りますが、端末一覧からは消えます。元に戻せません。")))return false;
+      await del("devices",d.id);toast(d.no+" を削除しました");return true;
+    }
+    const no=fv("fNo");if(!no){toast("管理番号を入れてください");return false}
+    const dup=devByNo(no);if(dup&&(!d||dup.id!==d.id)){toast("管理番号 "+no+" はすでに登録されています");return false}
+    const data={no,model:fv("fModel"),serial:fv("fSerial"),bought:fv("fBought"),place:fv("fPlace"),account:fv("fAccount"),memo:(dform.querySelector("#fMemo").value||"").trim()};
+    if(dform.querySelector("#fStatus"))data.status=fv("fStatus");
+    if(d){await patch("devices",d.id,stamp(data));toast(no+" を保存しました")}
+    else{data.status="保管中";await put("devices",newId(),stamp(data));toast(no+" を登録しました")}
+    return true;
+  });
+}
+
+function askConfirm(title,body){
+  return new Promise(res=>{
+    const d2=document.createElement("dialog");
+    d2.innerHTML='<form class="dlg" method="dialog"><h2>'+esc(title)+'</h2><div class="sub">'+esc(body)+'</div><div class="actions"><button class="btn" value="no">やめる</button><button class="btn danger" value="yes">はい</button></div></form>';
+    document.body.appendChild(d2);
+    d2.addEventListener("close",()=>{res(d2.returnValue==="yes");d2.remove()});
+    d2.showModal();
+  });
+}
+
+// lend
+function updLendInfo(){
+  const d=devByNo($("#lnNo").value);
+  const t=$("#lnType").value;$("#lnDueWrap").style.display=t==="貸出"?"":"none";
+  if(!$("#lnNo").value){$("#lnInfo").textContent="保管中の端末だけ選べます。";return}
+  if(!d){$("#lnInfo").textContent="この管理番号は登録されていません。";return}
+  $("#lnInfo").textContent=(d.status||"保管中")==="保管中"?(d.model||"")+" 保管中・渡せます":("この端末は「"+d.status+"」です"+(d.holder?"("+d.holder+")":""));
+}
+$("#lnNo").addEventListener("input",updLendInfo);$("#lnType").addEventListener("change",updLendInfo);updLendInfo();
+async function lendDevice(d,type,name,cls,due,memo){
+  const lid=newId();const date=today();
+  await put("loans",lid,stamp({deviceId:d.id,no:d.no,type,name,cls,outAt:date,due:type==="貸出"?due:"",memo,inAt:"",outBy:me||"",createdAt:nowIso()}));
+  await patch("devices",d.id,stamp({status:type==="配布"?"配布中":"貸出中",holder:name,holderClass:cls,loanId:lid,outAt:date,due:type==="貸出"?due:""}));
+}
+$("#lendForm").addEventListener("submit",async e=>{e.preventDefault();if(!need())return;
+  const d=devByNo($("#lnNo").value);if(!d){toast("その管理番号の端末は登録されていません");return}
+  if((d.status||"保管中")!=="保管中"){toast(d.no+" は「"+d.status+"」なので渡せません");return}
+  const name=norm($("#lnName").value);if(!name){toast("氏名を入れてください");return}
+  const btn=e.submitter;btn.disabled=true;
+  try{await lendDevice(d,$("#lnType").value,name,norm($("#lnCls").value),$("#lnDue").value,norm($("#lnMemo").value));toast(d.no+" を "+name+" さんに"+$("#lnType").value+"しました");$("#lnNo").value="";$("#lnName").value="";$("#lnMemo").value="";updLendInfo();$("#lnNo").focus()}
+  catch(err){toast(failMsg(err))}finally{btn.disabled=false}
+});
+
+// return
+function updRtInfo(){const d=devByNo($("#rtNo").value);
+  if(!$("#rtNo").value){$("#rtInfo").textContent="配布中・貸出中の端末だけ選べます。";return}
+  if(!d){$("#rtInfo").textContent="この管理番号は登録されていません。";return}
+  $("#rtInfo").textContent=(d.status==="配布中"||d.status==="貸出中")?d.holder+"("+(d.holderClass||"")+")に"+d.status.replace("中","")+"中・"+d.outAt+"から":"この端末は「"+(d.status||"保管中")+"」です";}
+$("#rtNo").addEventListener("input",updRtInfo);
+async function returnDevice(d,memo){
+  const date=today();
+  if(d.loanId&&S.loans.some(l=>l.id===d.loanId))await patch("loans",d.loanId,stamp({inAt:date,inBy:me||"",inMemo:memo||""}));
+  await patch("devices",d.id,stamp({status:"保管中",holder:"",holderClass:"",loanId:"",outAt:"",due:""}));
+}
+$("#returnForm").addEventListener("submit",async e=>{e.preventDefault();if(!need())return;
+  const d=devByNo($("#rtNo").value);if(!d){toast("その管理番号の端末は登録されていません");return}
+  if(!(d.status==="配布中"||d.status==="貸出中")){toast(d.no+" は「"+(d.status||"保管中")+"」です");return}
+  const btn=e.submitter;btn.disabled=true;
+  try{await returnDevice(d,norm($("#rtMemo").value));toast(d.no+" の返却を記録しました");$("#rtNo").value="";$("#rtMemo").value="";updRtInfo();$("#rtNo").focus()}
+  catch(err){toast(failMsg(err))}finally{btn.disabled=false}
+});
+function confirmReturn(d,memo){
+  openDlg('<h2>'+esc(d.no)+' の返却</h2><div class="sub">'+esc(d.holder)+'('+esc(d.holderClass)+')から返却を受けます。</div><div class="row"><div class="field"><label for="cRtMemo">返却時のメモ</label><input id="cRtMemo" value="'+esc(memo)+'"></div></div><div class="actions"><button class="btn" value="cancel" formnovalidate>やめる</button><button class="btn primary" value="ok">返却を記録</button></div>',
+  async()=>{if(!need())return false;await returnDevice(d,fv("cRtMemo"));toast(d.no+" の返却を記録しました");return true});
+}
+
+// accounts
+function openAccount(id){
+  const a=id?S.accounts.find(x=>x.id===id):null;const x=a||{};
+  let h='<header><h2>'+(a?'アカウントを編集':'アカウントを登録')+'</h2></header>';
+  h+='<div class="row">'+fld("aId","アカウントID",x.accountId,{req:true,ph:"s2401@example.ed.jp"})+fld("aKind","種類",x.kind||ACCOUNT_KINDS[0],{options:ACCOUNT_KINDS,narrow:true})+'</div>';
+  h+='<div class="row">'+fld("aName","氏名",x.name)+fld("aCls","クラス・所属",x.cls,{narrow:true})+'</div>';
+  h+='<div class="row">'+fld("aDev","紐づく端末の管理番号",x.deviceNo,{list:"dlAll",narrow:true})+fld("aState","状態",x.state||"有効",{options:["有効","停止"],narrow:true})+fld("aMemo","メモ",x.memo)+'</div>';
+  h+='<div class="sub">パスワードは書かないでください。</div>';
+  h+='<div class="actions">'+(a?'<button class="btn danger" value="delete" formnovalidate>削除</button>':'')+'<button class="btn" value="cancel" formnovalidate>閉じる</button><button class="btn primary" value="save">保存</button></div>';
+  openDlg(h,async act=>{if(!need())return false;
+    if(act==="delete"){if(!(await askConfirm("アカウント "+a.accountId+" を削除しますか？","元に戻せません。")))return false;await del("accounts",a.id);toast("削除しました");return true}
+    const accountId=fv("aId");if(!accountId){toast("アカウントIDを入れてください");return false}
+    const dup=S.accounts.find(z=>norm(z.accountId)===accountId&&(!a||z.id!==a.id));if(dup){toast("そのアカウントIDはすでに登録されています");return false}
+    const data={accountId,kind:fv("aKind"),name:fv("aName"),cls:fv("aCls"),deviceNo:fv("aDev"),state:fv("aState"),memo:fv("aMemo")};
+    if(a)await patch("accounts",a.id,stamp(data));else await put("accounts",newId(),stamp(data));
+    const dv=data.deviceNo&&devByNo(data.deviceNo);if(dv&&!dv.account)await patch("devices",dv.id,stamp({account:accountId}));
+    toast("保存しました");return true;
+  });
+}
+
+// repairs
+$("#rpDate").value=today();
+$("#rpForm").addEventListener("submit",async e=>{e.preventDefault();if(!need())return;
+  const d=devByNo($("#rpNo").value);if(!d){toast("その管理番号の端末は登録されていません");return}
+  if(d.status==="修理中"){toast(d.no+" はすでに修理中です");return}
+  const btn=e.submitter;btn.disabled=true;
+  try{
+    await put("repairs",newId(),stamp({deviceId:d.id,no:d.no,reportedAt:$("#rpDate").value||today(),cause:$("#rpCause").value,symptom:norm($("#rpSymptom").value),step:"受付",sentAt:"",doneAt:"",vendor:"",cost:"",memo:"",holder:d.holder||"",holderClass:d.holderClass||"",prevStatus:d.status||"保管中",createdAt:nowIso()}));
+    await patch("devices",d.id,stamp({status:"修理中",prevStatus:d.status||"保管中"}));
+    toast(d.no+" を修理中にしました");$("#rpNo").value="";$("#rpSymptom").value="";
+  }catch(err){toast(failMsg(err))}finally{btn.disabled=false}
+});
+function openRepair(id){
+  const r=S.repairs.find(x=>x.id===id);if(!r)return;
+  let h='<header><h2>修理 <span class="mono">'+esc(r.no)+'</span></h2>'+pill(r.step)+'</header><div class="sub">'+esc(r.reportedAt)+' '+esc(r.cause)+'・'+esc(r.symptom)+(r.holder?'(使用者 '+esc(r.holder)+' '+esc(r.holderClass)+')':'')+'</div>';
+  h+='<div class="row">'+fld("rStep","進み具合",r.step,{options:["受付","修理依頼中","完了"],narrow:true})+fld("rSent","修理依頼日",r.sentAt,{type:"date",narrow:true})+fld("rDone","完了日",r.doneAt,{type:"date",narrow:true})+'</div>';
+  h+='<div class="row">'+fld("rVendor","依頼先",r.vendor,{ph:"業者名・Apple修理受付番号"})+fld("rCost","費用(円)",r.cost,{narrow:true})+'</div>';
+  h+='<div class="row">'+fld("rSymptom","症状・状況",r.symptom)+'</div><div class="row">'+fld("rMemo","メモ",r.memo)+'</div>';
+  h+='<div class="sub">「完了」にすると、端末は修理前の状態('+esc(r.prevStatus||"保管中")+')に戻ります。代替機と交換した場合は、完了後に端末一覧で「廃棄」にしてください。</div>';
+  h+='<div class="actions"><button class="btn danger" value="delete" formnovalidate>記録を削除</button><button class="btn" value="cancel" formnovalidate>閉じる</button><button class="btn primary" value="save">保存</button></div>';
+  openDlg(h,async act=>{if(!need())return false;
+    const d=devById(r.deviceId);
+    if(act==="delete"){if(!(await askConfirm("この修理記録を削除しますか？","元に戻せません。")))return false;
+      await del("repairs",r.id);if(d&&d.status==="修理中"&&r.step!=="完了")await patch("devices",d.id,stamp({status:r.prevStatus||"保管中"}));toast("削除しました");return true}
+    const step=fv("rStep");let done=fv("rDone");if(step==="完了"&&!done)done=today();
+    await patch("repairs",r.id,stamp({step,sentAt:fv("rSent")||(step==="修理依頼中"&&!r.sentAt?today():r.sentAt||""),doneAt:done,vendor:fv("rVendor"),cost:fv("rCost"),symptom:fv("rSymptom"),memo:fv("rMemo")}));
+    if(d&&step==="完了"&&r.step!=="完了"&&d.status==="修理中"){
+      const back=r.prevStatus||"保管中";const upd={status:back};
+      if(back==="保管中"){upd.holder="";upd.holderClass="";}
+      await patch("devices",d.id,stamp(upd));
+    }
+    if(d&&step!=="完了"&&r.step==="完了"&&d.status!=="修理中")await patch("devices",d.id,stamp({status:"修理中",prevStatus:d.status||"保管中"}));
+    toast("保存しました");return true;
+  });
+}
+
+// ---------- CSV ----------
+function parseCSV(text){
+  const rows=[];let row=[],f="",q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===","){row.push(f);f=""}
+    else if(c==="\n"||c==="\r"){if(c==="\r"&&text[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f=""}
+    else if(c==="\t"&&!text.includes(",")){row.push(f);f=""}
+    else f+=c}
+  if(f!==""||row.length){row.push(f);rows.push(row)}
+  return rows.filter(r=>r.some(v=>v.trim()!==""));
+}
+function toObjects(text,map){
+  const rows=parseCSV(text.replace(/^﻿/,""));if(rows.length<2)return {items:[],missing:[]};
+  const head=rows[0].map(h=>norm(h));
+  const idx={};Object.entries(map).forEach(([key,aliases])=>{idx[key]=head.findIndex(h=>aliases.includes(h))});
+  const items=rows.slice(1).map(r=>{const o={};Object.keys(map).forEach(k=>{o[k]=idx[k]>=0?norm(r[idx[k]]):undefined});return o});
+  return {items,idx};
+}
+async function readFile(file){
+  const buf=await file.arrayBuffer();
+  try{return new TextDecoder("utf-8",{fatal:true}).decode(buf)}catch(e){return new TextDecoder("shift_jis").decode(buf)}
+}
+function csvCell(v){v=String(v==null?"":v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function toCSV(head,rows){return "﻿"+[head].concat(rows).map(r=>r.map(csvCell).join(",")).join("\r\n")}
+function normDate(s){if(!s)return "";const m=String(s).match(/(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);return m?m[1]+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0"):s}
+
+const IMP={
+  devices:{map:{no:["管理番号","番号"],serial:["シリアル番号","シリアル","serial"],model:["機種","モデル"],bought:["購入日","導入日"],place:["保管場所","場所"],memo:["メモ","備考"]},
+    tpl:[["管理番号","シリアル番号","機種","購入日","保管場所","メモ"],["A-001","DMPXXXXXXXX1","iPad 第9世代 64GB","2021/04/01","充電保管庫1",""]],
+    check:o=>o.no?null:"管理番号なし",
+    async run(o){const d=devByNo(o.no);const data={};["serial","model","place","memo"].forEach(k=>{if(o[k]!==undefined&&o[k]!=="")data[k]=o[k]});if(o.bought)data.bought=normDate(o.bought);
+      if(d){await patch("devices",d.id,stamp(data));return "更新"}
+      data.no=o.no;data.status="保管中";await put("devices",newId(),stamp(Object.assign({serial:"",model:"",place:"",memo:"",bought:""},data)));return "追加"}},
+  accounts:{map:{accountId:["アカウントid","アカウントID","ID","id","アカウント","メールアドレス"],kind:["種類","種別"],name:["氏名","名前"],cls:["クラス","所属","クラス・所属"],deviceNo:["管理番号","端末"],state:["状態"],memo:["メモ","備考"]},
+    tpl:[["アカウントID","種類","氏名","クラス","管理番号","状態","メモ"],["s240101@example.ed.jp","管理対象Apple ID","山田 太郎","1年1組","A-001","有効",""]],
+    check:o=>o.accountId?null:"アカウントIDなし",
+    async run(o){const a=S.accounts.find(z=>norm(z.accountId)===o.accountId);const data={};["kind","name","cls","deviceNo","state","memo"].forEach(k=>{if(o[k]!==undefined&&o[k]!=="")data[k]=o[k]});
+      if(a){await patch("accounts",a.id,stamp(data));return "更新"}
+      data.accountId=o.accountId;await put("accounts",newId(),stamp(Object.assign({kind:ACCOUNT_KINDS[0],name:"",cls:"",deviceNo:"",state:"有効",memo:""},data)));
+      const dv=data.deviceNo&&devByNo(data.deviceNo);if(dv&&!dv.account)await patch("devices",dv.id,stamp({account:o.accountId}));return "追加"}},
+  bulkLend:{map:{no:["管理番号","番号"],name:["氏名","名前","使用者"],cls:["クラス","所属","クラス・所属"],type:["種別","種類"],due:["返却予定日","返却日"]},
+    tpl:[["管理番号","氏名","クラス","種別","返却予定日"],["A-001","山田 太郎","1年1組","配布",""]],
+    check:o=>{if(!o.no||!o.name)return "管理番号か氏名なし";const d=devByNo(o.no);if(!d)return "未登録の端末";if((d.status||"保管中")!=="保管中")return "「"+d.status+"」のため飛ばし";return null},
+    async run(o){const d=devByNo(o.no);const t=o.type==="貸出"?"貸出":"配布";await lendDevice(d,t,o.name,o.cls||"",normDate(o.due||""),"一括登録");return t}}
+};
+document.querySelectorAll("[data-imp]").forEach(card=>{
+  const k=card.dataset.imp;const cfg=IMP[k];
+  card.insertAdjacentHTML("beforeend",
+    '<div class="row"><button class="btn small" type="button" data-tpl>見本のCSVを保存</button></div>'+
+    '<div class="field"><label for="f-'+k+'">CSVファイルを選ぶ</label><input id="f-'+k+'" type="file" accept=".csv,.txt,text/csv"></div>'+
+    '<div class="field"><label for="t-'+k+'">または表を貼り付け(Excelからコピーしても可)</label><textarea id="t-'+k+'" placeholder="'+esc(cfg.tpl.map(r=>r.join(",")).join("\n"))+'"></textarea></div>'+
+    '<div class="sub" data-pre>　</div><div class="progress" hidden><span></span></div>'+
+    '<div class="row"><button class="btn primary" type="button" data-go disabled>取り込む</button></div>');
+  const ta=card.querySelector("textarea"),pre=card.querySelector("[data-pre]"),go=card.querySelector("[data-go]"),bar=card.querySelector(".progress");
+  let parsed=[];
+  function preview(){
+    const r=toObjects(ta.value,cfg.map);parsed=r.items;
+    if(!ta.value.trim()){pre.textContent="　";go.disabled=true;return}
+    if(!parsed.length){pre.textContent="見出し行と、1行以上のデータが必要です。";go.disabled=true;return}
+    const firstKey=Object.keys(cfg.map)[0];if(r.idx&&r.idx[firstKey]<0){pre.textContent="見出しに「"+cfg.map[firstKey][0]+"」が見つかりません。";go.disabled=true;return}
+    const bad=parsed.map(cfg.check).filter(Boolean);
+    pre.textContent=parsed.length+"行を読み取りました。"+(bad.length?"うち"+bad.length+"行は取り込みません("+[...new Set(bad)].join("・")+")。":"");
+    go.disabled=parsed.length===bad.length;
+  }
+  ta.addEventListener("input",preview);
+  card.querySelector("input[type=file]").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;ta.value=await readFile(f);preview()});
+  card.querySelector("[data-tpl]").addEventListener("click",()=>save("見本_"+({devices:"端末",accounts:"アカウント",bulkLend:"一括配布"})[k]+".csv",toCSV(cfg.tpl[0],cfg.tpl.slice(1))));
+  go.addEventListener("click",async()=>{if(!need())return;
+    const todo=parsed.filter(o=>!cfg.check(o));if(!todo.length)return;
+    go.disabled=true;ta.disabled=true;bar.hidden=false;const sp=bar.querySelector("span");
+    const res={};let fail=0,done=0;
+    for(const o of todo){
+      if(k!=="bulkLend"||!cfg.check(o)){
+        try{const r=await cfg.run(o);res[r]=(res[r]||0)+1}catch(e){fail++}
+      }
+      done++;sp.style.width=Math.round(done/todo.length*100)+"%";pre.textContent=done+" / "+todo.length+" 件を処理中…";
+      if(done%50===0)await sleep(0);
+    }
+    pre.textContent="画面に反映しました(スプレッドシートへの保存は右上の表示で確認できます)。"+Object.entries(res).map(([a,b])=>a+" "+b+"件").join("、")+(fail?"、失敗 "+fail+"件":"");
+    ta.disabled=false;ta.value="";parsed=[];bar.hidden=true;sp.style.width="0";
+  });
+});
+
+function save(filename,data){
+  try{const url=URL.createObjectURL(new Blob([data],{type:"text/csv"}));const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);toast("保存しました")}catch(e){toast("保存できませんでした")}
+}
+document.querySelectorAll("[data-exp]").forEach(b=>b.addEventListener("click",()=>{
+  const k=b.dataset.exp;const t=today().replace(/-/g,"");
+  if(k==="devices")save("iPad端末一覧_"+t+".csv",toCSV(["管理番号","状態","使用者","クラス","渡した日","返却予定日","機種","シリアル番号","購入日","アカウント","保管場所","メモ"],S.devices.slice().sort((a,b)=>cmpNo(a.no,b.no)).map(d=>[d.no,d.status||"保管中",d.holder,d.holderClass,d.outAt,d.due,d.model,d.serial,d.bought,d.account,d.place,d.memo])));
+  if(k==="loans")save("配布貸出履歴_"+t+".csv",toCSV(["管理番号","種別","氏名","クラス","渡した日","返却予定日","返却日","メモ","返却時メモ","処理した人"],S.loans.slice().sort((a,b)=>String(a.outAt).localeCompare(String(b.outAt))).map(l=>[l.no,l.type,l.name,l.cls,l.outAt,l.due,l.inAt,l.memo,l.inMemo,l.outBy||""])));
+  if(k==="accounts")save("アカウント_"+t+".csv",toCSV(["アカウントID","種類","氏名","クラス","管理番号","状態","メモ"],S.accounts.slice().sort((a,b)=>cmpNo(a.cls,b.cls)||cmpNo(a.accountId,b.accountId)).map(a=>[a.accountId,a.kind,a.name,a.cls,a.deviceNo,a.state,a.memo])));
+  if(k==="repairs")save("修理記録_"+t+".csv",toCSV(["管理番号","進み具合","発生日","区分","症状","使用者","クラス","修理依頼日","完了日","依頼先","費用","メモ"],S.repairs.slice().sort((a,b)=>String(a.reportedAt).localeCompare(String(b.reportedAt))).map(r=>[r.no,r.step,r.reportedAt,r.cause,r.symptom,r.holder,r.holderClass,r.sentAt,r.doneAt,r.vendor,r.cost,r.memo])));
+}));
+
+$("#connBtn").addEventListener("click",()=>openSetup());
+$("#reloadBtn").addEventListener("click",()=>{if(queue.length||flushing){toast("保存が終わってから押してください");return}reload()});
+init();
+})();
+</script>
+</body>
+</html>
