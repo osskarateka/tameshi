@@ -406,6 +406,7 @@ async function init(){
 function showNotice(msg,kind){const n=$("#notice");n.hidden=false;n.className="banner "+(kind||"warn");n.textContent=msg}
 async function resolveNames(){}
 
+function cleanKey(v){return String(v||"").normalize("NFKC").replace(/^\s*合言葉\s*[:：]?/,"").replace(/\s+/g,"")}
 function openSetup(){
   const c=conn||{};
   openDlg('<header><h2>接続設定</h2></header>'+
@@ -415,7 +416,7 @@ function openSetup(){
     '<div class="sub" id="cMsg"></div>'+
     '<div class="actions"><button class="btn" value="cancel" formnovalidate>閉じる</button><button class="btn primary" value="ok">接続する</button></div>',
   async()=>{
-    const nc={url:fv("cUrl"),key:(dform.querySelector("#cKey").value||"").trim(),name:fv("cName")};
+    const nc={url:fv("cUrl"),key:cleanKey(dform.querySelector("#cKey").value),name:fv("cName")};
     if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(nc.url)){dform.querySelector("#cMsg").textContent="URLは https://script.google.com/ で始まるものを入れてください。";return false}
     const old=conn;conn=nc;
     try{const j=await api("load");saveConn(nc);me=nc.name;$("#whoami").textContent=nc.name+" さんとして記録します";setData(j.data);$("#notice").hidden=true;setSync("最新の状態です");toast("接続しました");
