@@ -44,7 +44,8 @@ const SHEETS = {
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('iPad管理簿')
     .addItem('① シートを準備する', 'setupSheets')
-    .addItem('② 合言葉を設定する', 'setPassphrase')
+    .addItem('② 合言葉を表示する', 'showPassphrase')
+    .addItem('③ 合言葉を変更する', 'setPassphrase')
     .addToUi();
 }
 
@@ -61,7 +62,21 @@ function setupSheets() {
   });
   const first = ss.getSheetByName('シート1');
   if (first && first.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(first);
-  SpreadsheetApp.getUi().alert('シートを準備しました。次に「② 合言葉を設定する」を選んでください。');
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('PASSPHRASE')) props.setProperty('PASSPHRASE', makePassphrase());
+  SpreadsheetApp.getUi().alert('シートを準備しました。\n\nアプリに接続するときの合言葉:\n' + props.getProperty('PASSPHRASE') + '\n\n(あとからメニューの「② 合言葉を表示する」でも確認できます)');
+}
+
+function makePassphrase() {
+  const c = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let p = '';
+  for (let i = 0; i < 10; i++) p += c.charAt(Math.floor(Math.random() * c.length));
+  return p;
+}
+
+function showPassphrase() {
+  const p = PropertiesService.getScriptProperties().getProperty('PASSPHRASE');
+  SpreadsheetApp.getUi().alert(p ? '合言葉: ' + p : 'まだ合言葉がありません。「① シートを準備する」を実行してください。');
 }
 
 function setPassphrase() {
